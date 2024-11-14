@@ -1,0 +1,4 @@
+*.db
+*.exe
+__pycache__
+*key.txt
