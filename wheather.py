@@ -73,7 +73,7 @@ def get_typhoon():
     if typhoon_web==None:
         return None
     try:
-        return typhoon_web[0].find('h3').get_text(),f"## 中央氣象署在{typhoon_web[0].find('p').get_text()[5:]}發布{typhoon_web[0].find('h3').get_text()} {typhoon_web[0].find('span').get_text()}，大略內容如下：\n{typhoon_web[1]}",typhoon_web[0].find('img')['src']
+        return typhoon_web[0].find('span').get_text(),f"## 中央氣象署在{typhoon_web[0].find('p').get_text()[5:]}發布{typhoon_web[0].find('h3').get_text()} {typhoon_web[0].find('span').get_text()}，大略內容如下：\n{typhoon_web[1]}",typhoon_web[0].find('img')['src']
     except:
         print('web error')
         return None
