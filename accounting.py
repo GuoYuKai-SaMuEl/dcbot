@@ -1,5 +1,5 @@
 import sqlite3
-from datetime import datetime
+import datetime
 def query_creditor(creditor):
     con = sqlite3.connect('accounting.db')
     cursor = con.cursor()
@@ -33,7 +33,7 @@ def new(creditor,debtor,amount,reason='無'):
     con = sqlite3.connect('accounting.db')
     cursor = con.cursor()
     cursor.execute(f'insert into accounting (creditor, debtor, amount, reason, time)\
-                                    values (\'{creditor}\', \'{debtor}\',\'{amount}\',\'{reason}\',\'{datetime.now()+datetime.timedelta(hours=8)}\')')
+                                    values (\'{creditor}\', \'{debtor}\',\'{amount}\',\'{reason}\',\'{datetime.datetime.now()+datetime.timedelta(hours=8)}\')')
     cursor.close()
     con.commit()
     con.close()
