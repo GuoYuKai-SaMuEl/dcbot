@@ -189,7 +189,7 @@ async def clock():
             report=wheather.get_warning()
             global last_warning
             if report!=None and (last_warning==None or last_warning[0]!=report[0] or last_warning[1]-dt>=datetime.timedelta(minutes=75)):
-                last_warning=(dt,report[0])
+                last_warning=(report[0],dt)
                 await wheater_channel.send(report[1])
         if 9<=dt.hour<=21 and dt.minute%10==0:
             report=wheather.get_typhoon()
