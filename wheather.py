@@ -25,7 +25,7 @@ def get_warning():
                 return None
                 #return f'依據中央氣象署資料，目前{now.hour}時{now.minute}分，台北市沒有發布任何天氣警報！'
             else:
-                return f'依據中央氣象署資料，目前{now.hour}時{now.minute}分，台北市發布'+\
+                return posts['records']['location'][0]['hazardConditions']['hazards'],f'依據中央氣象署資料，目前{now.hour}時{now.minute}分，台北市發布'+\
                     '、'.join([f'{t['info']['phenomena']}'for t in posts['records']['location'][0]['hazardConditions']['hazards']])+\
                     '警報!請注意安全!'
         else:
@@ -36,8 +36,8 @@ def get_warning():
         return None
 def get_now():
     now=datetime.datetime.now()+datetime.timedelta(hours=8)
-    url1=f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0003-001?Authorization={apikey}&StationId=466920"
-    url2=f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0002-001?Authorization={apikey}&StationId=466920"
+    url1=f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0003-001?Authorization={apikey}&StationId=A0A010"
+    url2=f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0002-001?Authorization={apikey}&StationId=A0A010"
     try:
         response1=requests.get(url1)
         response2=requests.get(url2)
@@ -45,7 +45,8 @@ def get_now():
             posts = response1.json()
             result = posts['records']['Station'][0]['WeatherElement']
             posts = response2.json()
-            return f'依據中央氣象署資料，目前{now.hour}時{now.minute}分，台北市天氣{result['Weather']}，氣溫{result['AirTemperature']}攝氏度，風速{result['WindSpeed']}m/s，過去10分鐘降水量{posts['records']['Station'][0]['RainfallElement']['Past10Min']['Precipitation']}mm'
+            print(posts)
+            return f'依據中央氣象署資料，目前{now.hour}時{now.minute}分，台北市天氣{result['Weather']}，氣溫{result['AirTemperature']}攝氏度，風速{result['WindSpeed']}m/s，過去10分鐘降水量{posts['records']['Station'][0]['RainfallElement']['Past10Min']['Precipitation']}mm，過去1小時降水量{posts['records']['Station'][0]['RainfallElement']['Past1hr']['Precipitation']}mm'
         else:
             print('API error!')
             return None
@@ -77,9 +78,13 @@ def get_typhoon():
     except:
         print('web error')
         return None
+def set_apikey(_apikey):
+    global apikey
+    apikey=_apikey
 load_chrome()
-apikeyfile = open("apikey.txt", "r")
-apikey = apikeyfile.read()
+#apikeyfile = open("apikey.txt", "r")
+#apikey = apikeyfile.read()
+apikey=None
 if __name__=='__main__':
     # print(get_typhoon())
     # print(get_now())

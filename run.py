@@ -187,8 +187,10 @@ async def clock():
                 await wheater_channel.send(report)
         if 9<=dt.hour<=21 and dt.minute%30==0:
             report=wheather.get_warning()
-            if report!=None:
-                await wheater_channel.send(report)
+            global last_warning
+            if report!=None and (last_warning[0]!=report[0] or last_warning[1]-dt>=datetime.timedelta(minutes=80)):
+                last_warning=(dt,report[0])
+                await wheater_channel.send(report[1])
         if 9<=dt.hour<=21 and dt.minute%10==0:
             report=wheather.get_typhoon()
             global last_typhoon_report
@@ -205,6 +207,8 @@ async def clock():
 
 dt=None
 last_typhoon_report=None
+last_warning=None
 apikeyfile = open("dcbotkey.txt", "r")
 apikey = apikeyfile.read()
+wheather.set_apikey(open("apikey.txt","r").read())
 bot.run(apikey)
