@@ -86,7 +86,8 @@ load_chrome()
 #apikey = apikeyfile.read()
 apikey=None
 if __name__=='__main__':
+    set_apikey(open('apikey.txt','r').read())
     # print(get_typhoon())
-    # print(get_now())
+    print(get_now())
     # print(get_warning())
     pass
