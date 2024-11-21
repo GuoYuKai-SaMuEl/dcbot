@@ -46,7 +46,7 @@ def get_now():
             result = posts['records']['Station'][0]['WeatherElement']
             posts = response2.json()
             print(posts)
-            return f'依據中央氣象署資料，目前{now.hour}時{now.minute}分，台北市天氣{result['Weather']}，氣溫{result['AirTemperature']}攝氏度，風速{result['WindSpeed']}m/s，過去10分鐘降水量{posts['records']['Station'][0]['RainfallElement']['Past10Min']['Precipitation']}mm，過去1小時降水量{posts['records']['Station'][0]['RainfallElement']['Past1hr']['Precipitation']}mm'
+            return f'依據中央氣象署資料，目前{now.hour}時{now.minute}分，台北市天氣{result['Weather'] if result['Weather']!=-99 else '不明'}，氣溫{result['AirTemperature'] if result['AirTemperature']!=-99 else '不明'}攝氏度，風速{result['WindSpeed'] if result['WindSpeed']!=-99 else '不明'}m/s，過去10分鐘降水量{posts['records']['Station'][0]['RainfallElement']['Past10Min']['Precipitation']}mm，過去1小時降水量{posts['records']['Station'][0]['RainfallElement']['Past1hr']['Precipitation']}mm'
         else:
             print('API error!')
             return None
@@ -81,7 +81,7 @@ def get_typhoon():
 def set_apikey(_apikey):
     global apikey
     apikey=_apikey
-load_chrome()
+#load_chrome()
 #apikeyfile = open("apikey.txt", "r")
 #apikey = apikeyfile.read()
 apikey=None

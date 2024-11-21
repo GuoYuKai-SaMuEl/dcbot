@@ -188,24 +188,24 @@ async def clock():
         if 9<=dt.hour<=21 and dt.minute%10==0:
             report=wheather.get_warning()
             global last_warning
-            if last_warning!=None:
-                print(dt,last_warning[1],dt-last_warning[1])
+            #if last_warning!=None:
+                #print(dt,last_warning[1],dt-last_warning[1])
             if report!=None and (last_warning==None or last_warning[0]!=report[0] or dt-last_warning[1]>=datetime.timedelta(minutes=75)):
                 last_warning=(report[0],dt)
-                #await wheater_channel.send(report[1])
-        if 9<=dt.hour<=21 and dt.minute%10==0:
-            report=wheather.get_typhoon()
-            global last_typhoon_report
-            if report!=None and last_typhoon_report!=report[0]:
-                last_typhoon_report=report[0]
                 await wheater_channel.send(report[1])
-                try:
-                    img = requests.get('https://www.cwa.gov.tw'+report[2]).content
-                    with open('typhoon.jpg', 'wb') as handler:
-                        handler.write(img)
-                    await wheater_channel.send(file=discord.File('typhoon.jpg'))
-                except:
-                    print('img error')
+        #if 9<=dt.hour<=21 and dt.minute%10==0:
+        #    report=wheather.get_typhoon()
+        #    global last_typhoon_report
+        #    if report!=None and last_typhoon_report!=report[0]:
+        #        last_typhoon_report=report[0]
+        #        await wheater_channel.send(report[1])
+        #        try:
+        #            img = requests.get('https://www.cwa.gov.tw'+report[2]).content
+        #            with open('typhoon.jpg', 'wb') as handler:
+        #                handler.write(img)
+        #            await wheater_channel.send(file=discord.File('typhoon.jpg'))
+        #        except:
+        #            print('img error')
 
 dt=None
 last_typhoon_report=None
