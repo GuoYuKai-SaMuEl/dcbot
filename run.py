@@ -21,7 +21,8 @@ async def on_ready():
 async def on_message(message: discord.Message):
     print(message)
     if '笑死' in message.content:
-        await message.channel.send(file=discord.File('lol.jpg'))
+        await message.add_reaction('<:lol:1311924811576115210>')
+        #await message.channel.send(file=discord.File('lol.jpg'))
         #await message.channel.send('<:lol:1305463357830332446>')
 @bot.slash_command(name="借", description = "借錢給某人")
 async def 借(interaction: discord.Interaction,誰:discord.User,金額:int,註記:str='無'):
@@ -105,7 +106,7 @@ async def 收(interaction: discord.Interaction,誰:discord.User,金額:int):
         await interaction.response.send_message(f'查無<@{誰.id}>欠<@{interaction.author.id}>{金額}元的紀錄，目前僅支援一次償還整筆債務的功能，請確認後再試')
         return
     t=accounting.delete(interaction.author.id,誰.id,金額)
-    await interaction.send_message('收錢成功，刪除以下紀錄\n'+f"<@{t[0]}>借<@{t[1]}>{t[2]}元，註記:{t[3]}，時間:{t[4]}")
+    await interaction.response.send_message('收錢成功，刪除以下紀錄\n'+f"<@{t[0]}>借<@{t[1]}>{t[2]}元，註記:{t[3]}，時間:{t[4]}")
     return
 
 @bot.slash_command(name="查", description = "查詢借錢、欠錢紀錄")
