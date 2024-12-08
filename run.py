@@ -9,6 +9,7 @@ import wheather
 import asyncio
 import datetime
 import requests
+import dice
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='/',intents=intents)
 
@@ -145,6 +146,36 @@ async def 提醒刪(interaction: discord.Interaction,週幾:int,幾點:int,幾�
     else:
         await interaction.response.send_message('刪除以下提醒\n'\
             +'\n'.join([f"每週{t[1]}的{t[2]//100}點{t[2]%100}分提醒{t[3]}" for t in reminderlist]),ephemeral=True)
+@bot.slash_command(name="骰", description = "擲一顆經典骰子")
+async def 骰(interaction: discord.Interaction,基本:str,條件1:str,結果1:str,條件2:str=None,結果2:str=None,條件3:str=None,結果3:str=None,條件4:str=None,結果4:str=None,條件5:str=None,結果5:str=None):
+    cons=[[條件1,結果1]]
+    for i in range(2,5):
+        if eval('條件'+str(i))!=None and eval('結果'+str(i))!=None:
+            cons.append([eval('條件'+str(i)),eval('結果'+str(i))])
+        else:
+            break
+    result=dice.dice([1,6],1,基本,cons)
+    await interaction.response.send_message(f"擲一顆經典骰子得到點數{result[0][0]}，結果為{result[1]}！")
+@bot.slash_command(name="骰多顆", description = "擲多顆經典骰子")
+async def 骰多顆(interaction: discord.Interaction,幾顆:int,基本:str,條件1:str,結果1:str,條件2:str=None,結果2:str=None,條件3:str=None,結果3:str=None,條件4:str=None,結果4:str=None,條件5:str=None,結果5:str=None):
+    cons=[[條件1,結果1]]
+    for i in range(2,5):
+        if eval('條件'+str(i))!=None and eval('結果'+str(i))!=None:
+            cons.append([eval('條件'+str(i)),eval('結果'+str(i))])
+        else:
+            break
+    result=dice.dice([1,6],幾顆,基本,cons)
+    await interaction.response.send_message(f"擲多顆經典骰子得到點數{','.join(list(map(str,result[0])))}，結果為{result[1]}！")
+@bot.slash_command(name="骰多顆", description = "擲多顆自訂骰子")
+async def 骰自訂(interaction: discord.Interaction,下界:int,上界:int,幾顆:int,基本:str,條件1:str,結果1:str,條件2:str=None,結果2:str=None,條件3:str=None,結果3:str=None,條件4:str=None,結果4:str=None,條件5:str=None,結果5:str=None):
+    cons=[[條件1,結果1]]
+    for i in range(2,5):
+        if eval('條件'+str(i))!=None and eval('結果'+str(i))!=None:
+            cons.append([eval('條件'+str(i)),eval('結果'+str(i))])
+        else:
+            break
+    result=dice.dice([下界,上界],幾顆,基本,cons)
+    await interaction.response.send_message(f"擲多顆經典骰子得到點數{','.join(list(map(str,result[0])))}，結果為{result[1]}！")
 '''
 async def 通識(ctx):
     cnt=0
