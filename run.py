@@ -166,7 +166,7 @@ async def 骰多顆(interaction: discord.Interaction,幾顆:int,基本:str,條�
             break
     result=dice.dice([1,6],幾顆,基本,cons)
     await interaction.response.send_message(f"擲多顆經典骰子得到點數{','.join(list(map(str,result[0])))}，結果為{result[1]}！")
-@bot.slash_command(name="骰多顆", description = "擲多顆自訂骰子")
+@bot.slash_command(name="骰自訂", description = "擲多顆自訂骰子")
 async def 骰自訂(interaction: discord.Interaction,下界:int,上界:int,幾顆:int,基本:str,條件1:str,結果1:str,條件2:str=None,結果2:str=None,條件3:str=None,結果3:str=None,條件4:str=None,結果4:str=None,條件5:str=None,結果5:str=None):
     cons=[[條件1,結果1]]
     for i in range(2,5):
