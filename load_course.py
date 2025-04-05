@@ -11,7 +11,6 @@ from selenium.webdriver.common.by import By
 
 def load_chrome():
     options = Options()
-    options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     global chrome
@@ -83,10 +82,10 @@ if __name__=='__main__':
             if data and len(cols)<len(data[0]):
                 break
             data.append(cols)
-        chrome.execute_script("__doPostBack('ctl00$MainContent$GridView1','Page$Next')")
-        time.sleep(0.2)
         if not soup.find(text='下一頁'):
             break
+        chrome.execute_script("__doPostBack('ctl00$MainContent$GridView1','Page$Next')")
+        time.sleep(0.2)
 
     df=pd.DataFrame(data)
     df.columns=col_name
