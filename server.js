@@ -53,7 +53,6 @@ app.post('/upload', upload.single('file'), (req, res) => {
 
         if (error) {
             console.error(`[Request: ${requestId}] CLI 錯誤:`, stderr || error.message);
-            // 即使錯誤也要回傳 JSON
             return res.status(500).json({ 
                 success: false, 
                 message: '❌ 平台同步失敗，請確認伺服器已安裝 storageto cli' 
@@ -61,27 +60,40 @@ app.post('/upload', upload.single('file'), (req, res) => {
         }
 
         try {
-            const result = JSON.parse(stdout);
+            // --- 強化解析邏輯：過濾 stdout 中的雜訊 ---
+            const jsonStart = stdout.indexOf('{');
+            const jsonEnd = stdout.lastIndexOf('}');
+            
+            if (jsonStart === -1 || jsonEnd === -1) {
+                throw new Error('輸出內容中找不到有效的 JSON 格式');
+            }
+
+            const cleanJson = stdout.substring(jsonStart, jsonEnd + 1);
+            const result = JSON.parse(cleanJson);
             
             // 修正：使用 PascalCase 欄位名稱 (FileInfo)
-            const fileInfo = result.FileInfo || result.file_info; // 相容性處理
+            const fileInfo = result.FileInfo || result.file_info;
             const downloadUrl = fileInfo ? fileInfo.url : null;
 
             if (!downloadUrl) {
-                throw new Error('找不到下載連結');
+                throw new Error('JSON 解析成功，但找不到下載連結 (FileInfo.url)');
             }
 
             console.log(`[Request: ${requestId}] 上傳完成: ${downloadUrl}`);
             
-            // 成功回傳 JSON
             res.json({
                 success: true,
                 message: '✅ 上傳成功',
                 download_url: downloadUrl
             });
         } catch (parseError) {
-            console.error('解析 CLI 輸出失敗，輸出內容為:', stdout);
-            res.status(500).json({ success: false, message: '❌ 解析平台結果失敗' });
+            console.error(`[Request: ${requestId}] 解析失敗:`, parseError.message);
+            console.error('原始輸出內容:', stdout);
+            res.status(500).json({ 
+                success: false, 
+                message: `❌ 解析結果失敗: ${parseError.message}`,
+                raw_output: stdout // 回傳給前端方便調試
+            });
         }
     });
 });
