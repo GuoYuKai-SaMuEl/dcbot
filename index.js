@@ -86,39 +86,45 @@ app.post('/upload', upload.single('file'), (req, res) => {
             return res.status(500).json({ success: false, message: '❌ 平台同步失敗' });
         }
 
+        let rawUrl = '';
         try {
+            // 1. 解析 JSON
             const jsonStart = stdout.indexOf('{');
             const jsonEnd = stdout.lastIndexOf('}');
-            
-            if (jsonStart === -1 || jsonEnd === -1) {
-                throw new Error('找不到 JSON 起點或終點');
-            }
+            if (jsonStart === -1 || jsonEnd === -1) throw new Error('找不到 JSON 內容');
 
             const cleanJson = stdout.substring(jsonStart, jsonEnd + 1);
             const result = JSON.parse(cleanJson);
-            
-            // 強化：處理 FileInfo 內部的大小寫問題
             const fileInfo = result.FileInfo || result.file_info;
-            if (!fileInfo) throw new Error('找不到 FileInfo 欄位');
+            rawUrl = fileInfo?.raw_url || fileInfo?.RawUrl || fileInfo?.url || fileInfo?.Url;
+            
+            if (!rawUrl) throw new Error('解析成功但找不到下載連結');
 
-            const rawUrl = fileInfo.raw_url || fileInfo.RawUrl || fileInfo.url || fileInfo.Url; 
+            console.log(`[Request: ${request_id}] 上傳成功，URL: ${rawUrl}`);
+        } catch (parseError) {
+            console.error(`[Request: ${request_id}] 解析失敗:`, parseError.message);
+            return res.status(500).json({ success: false, message: `❌ 解析失敗: ${parseError.message}` });
+        }
 
-            if (!rawUrl) throw new Error('找不到有效的下載連結 (raw_url/RawUrl)');
-
-            // --- 關鍵：讓 Bot 在 Discord 發送訊息 ---
+        // 2. 嘗試發送 Discord 訊息 (獨立於解析邏輯)
+        try {
             const channel = await client.channels.fetch(channel_id);
             if (channel) {
                 await channel.send({
                     content: `✅ **檔案上傳完成！**\n上傳者: <@${user_id}>\n檔名: \`${req.file.originalname}\`\n直接下載連結: ${rawUrl}`
                 });
             }
-
-            res.json({ success: true, download_url: rawUrl });
-        } catch (parseError) {
-            console.error(`[Request: ${request_id}] 解析失敗:`, parseError.message);
-            console.error('原始輸出內容:', stdout);
-            res.status(500).json({ success: false, message: `❌ 解析失敗: ${parseError.message}` });
+        } catch (discordError) {
+            console.error(`[Request: ${request_id}] Discord 發送失敗:`, discordError.message);
+            // 即使 Discord 失敗，我們仍回傳成功給前端，但告知 Discord 部分出錯
+            return res.json({ 
+                success: true, 
+                message: `✅ 上傳成功，但 Discord 訊息發送失敗 (${discordError.message})`,
+                download_url: rawUrl 
+            });
         }
+
+        res.json({ success: true, download_url: rawUrl });
     });
 });
 
