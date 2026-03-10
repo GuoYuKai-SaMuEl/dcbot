@@ -6,7 +6,7 @@ const fs = require('fs');
 const { exec } = require('child_process');
 
 const app = express();
-const PORT = 3000;
+const PORT = 6567;
 
 app.use(cors());
 app.use(express.static('public'));
