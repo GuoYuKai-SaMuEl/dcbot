@@ -43,7 +43,7 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
 // --- 2. 初始化 Express Server ---
 const app = express();
-const PORT = 3000;
+const PORT = 6567;
 app.use(cors());
 app.use(express.static('public'));
 
