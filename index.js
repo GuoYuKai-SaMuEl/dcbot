@@ -28,7 +28,10 @@ const client = new Client({
 const commands = [
     {
         name: 'upload',
-        description: '上傳檔案並在頻道公開分享直接下載連結'
+        description: '上傳檔案並在頻道公開分享直接下載連結',
+        // 2026 年新規定：明確指定指令可以在私訊與伺服器中使用
+        integration_types: [0, 1], // 0: Guild Install, 1: User Install
+        contexts: [0, 1, 2]       // 0: Guild, 1: Bot DM, 2: Private DM/Groups
     }
 ];
 
