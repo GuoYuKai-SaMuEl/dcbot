@@ -116,7 +116,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
                 // 優先嘗試發送到頻道
                 target = await client.channels.fetch(channel_id);
             } catch (err) {
-                console.log(`[Request: ${request_id}] 無法獲取頻道，準備嘗試私訊...`);
+                console.log(`[Request: ${request_id}] 獲取頻道失敗 (${err.message})，準備嘗試私訊...`);
             }
 
             const messagePayload = {
