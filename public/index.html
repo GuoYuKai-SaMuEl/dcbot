@@ -3,32 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 素材上傳平台 (後端測試)</title>
+    <title>AI 素材上傳平台 (Storage.to 同步)</title>
     <style>
         body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background-color: #f4f4f9; }
-        .card { background: #fff; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 400px; text-align: center; }
+        .card { background: #fff; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 450px; text-align: center; }
         .drop-zone { border: 2px dashed #ccc; padding: 2rem; margin-bottom: 1.5rem; cursor: pointer; border-radius: 8px; transition: border 0.3s; }
         .drop-zone:hover { border-color: #5865F2; }
         button { background-color: #5865F2; color: white; border: none; padding: 0.8rem 1.5rem; border-radius: 6px; cursor: pointer; font-size: 1rem; width: 100%; }
         button:hover { background-color: #4752c4; }
         #progress { margin-top: 1rem; color: #666; font-size: 0.9rem; }
-        #status { margin-top: 1rem; font-weight: bold; }
+        #status { margin-top: 1rem; font-weight: bold; overflow-wrap: break-word; }
+        .request-id { font-size: 0.8rem; color: #aaa; margin-bottom: 1rem; }
+        #link-container { margin-top: 1.5rem; padding: 1rem; background: #eef; border-radius: 8px; display: none; }
+        a { color: #5865F2; font-weight: bold; word-break: break-all; }
     </style>
 </head>
 <body>
     <div class="card">
         <h2>📁 檔案上傳</h2>
-        <p>上傳至您的後端機器 (無大小限制測試)</p>
+        <div id="requestDisplay" class="request-id"></div>
         <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
             <span id="fileName">點擊或拖放檔案到此處</span>
         </div>
         <input type="file" id="fileInput" style="display:none" onchange="updateFileName(this)">
-        <button onclick="uploadFile()">開始上傳</button>
+        <button id="uploadBtn" onclick="uploadFile()">開始同步上傳</button>
         <div id="progress"></div>
         <div id="status"></div>
+        <div id="link-container">
+            上傳成功！您的分享連結：<br><br>
+            <a id="downloadLink" href="#" target="_blank"></a>
+        </div>
     </div>
 
     <script>
+        // 從 URL 取得 Request ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const requestId = urlParams.get('request_id') || '無';
+        document.getElementById('requestDisplay').innerText = `Request ID: ${requestId}`;
+
         function updateFileName(input) {
             if (input.files.length > 0) {
                 document.getElementById('fileName').innerText = input.files[0].name;
@@ -42,29 +54,40 @@
             const file = fileInput.files[0];
             const formData = new FormData();
             formData.append('file', file);
+            formData.append('request_id', requestId);
 
             const status = document.getElementById('status');
             const progress = document.getElementById('progress');
-            status.innerText = '📤 上傳中...';
+            const btn = document.getElementById('uploadBtn');
+            const linkContainer = document.getElementById('link-container');
+
+            btn.disabled = true;
+            linkContainer.style.display = 'none';
+            status.innerText = '📤 上傳至後端伺服器中...';
 
             const xhr = new XMLHttpRequest();
             xhr.open('POST', '/upload', true);
 
-            // 進度追蹤
             xhr.upload.onprogress = function(e) {
                 if (e.lengthComputable) {
                     const percent = Math.round((e.loaded / e.total) * 100);
-                    progress.innerText = `進度: ${percent}% (${(e.loaded / (1024 * 1024)).toFixed(2)} MB / ${(e.total / (1024 * 1024)).toFixed(2)} MB)`;
+                    progress.innerText = `[1/2] 上傳至後端: ${percent}%`;
                 }
             };
 
             xhr.onload = function() {
+                btn.disabled = false;
                 if (xhr.status === 200) {
+                    const res = JSON.parse(xhr.responseText);
                     status.style.color = 'green';
-                    status.innerText = xhr.responseText;
+                    status.innerText = '[2/2] 平台同步完成！';
+                    
+                    document.getElementById('downloadLink').href = res.download_url;
+                    document.getElementById('downloadLink').innerText = res.download_url;
+                    linkContainer.style.display = 'block';
                 } else {
                     status.style.color = 'red';
-                    status.innerText = '❌ 上傳失敗: ' + xhr.responseText;
+                    status.innerText = '❌ 發生錯誤: ' + xhr.responseText;
                 }
             };
 
