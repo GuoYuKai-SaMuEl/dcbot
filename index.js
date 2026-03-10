@@ -6,13 +6,14 @@ const {
     Routes, 
     Events
 } = require('discord.js');
+const { v4: uuidv4 } = require('uuid'); // 請執行 npm install uuid
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 const commands = [
     {
         name: 'upload',
-        description: '獲取專屬上傳連結 (無視 Discord 大小限制)'
+        description: '獲取專屬上傳連結並取得外部下載連結'
     }
 ];
 
@@ -39,11 +40,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
 
     if (interaction.commandName === 'upload') {
-        // 使用者看到的私密訊息 (Ephemeral)
-        const uploadUrl = process.env.BACKEND_URL || 'http://localhost:3000';
+        const requestId = uuidv4();
+        const baseUrl = process.env.BACKEND_URL || 'http://localhost:3000';
+        const uploadUrl = `${baseUrl}?request_id=${requestId}`;
         
         await interaction.reply({
-            content: `👋 您好！為了支援超大檔案上傳，請點擊下方連結進入您的私密上傳通道：\n\n🔗 **[點我前往上傳頁面](${uploadUrl})**\n\n*(此連結僅您可見，上傳後後端將自動計算檔案大小)*`,
+            content: `👋 您好！\n您的專屬上傳連結已準備就緒（Request ID: \`${requestId}\`）：\n\n🔗 **[點我前往上傳頁面](${uploadUrl})**\n\n*(檔案將上傳至 Storage.to 平台並回傳連結)*`,
             ephemeral: true
         });
     }
