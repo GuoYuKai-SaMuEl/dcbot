@@ -84,10 +84,21 @@ app.post('/upload', upload.single('file'), (req, res) => {
         try {
             const jsonStart = stdout.indexOf('{');
             const jsonEnd = stdout.lastIndexOf('}');
-            const result = JSON.parse(stdout.substring(jsonStart, jsonEnd + 1));
             
+            if (jsonStart === -1 || jsonEnd === -1) {
+                throw new Error('找不到 JSON 起點或終點');
+            }
+
+            const cleanJson = stdout.substring(jsonStart, jsonEnd + 1);
+            const result = JSON.parse(cleanJson);
+            
+            // 強化：處理 FileInfo 內部的大小寫問題
             const fileInfo = result.FileInfo || result.file_info;
-            const rawUrl = fileInfo.raw_url; // 使用直接下載連結
+            if (!fileInfo) throw new Error('找不到 FileInfo 欄位');
+
+            const rawUrl = fileInfo.raw_url || fileInfo.RawUrl || fileInfo.url || fileInfo.Url; 
+
+            if (!rawUrl) throw new Error('找不到有效的下載連結 (raw_url/RawUrl)');
 
             // --- 關鍵：讓 Bot 在 Discord 發送訊息 ---
             const channel = await client.channels.fetch(channel_id);
@@ -99,7 +110,9 @@ app.post('/upload', upload.single('file'), (req, res) => {
 
             res.json({ success: true, download_url: rawUrl });
         } catch (parseError) {
-            res.status(500).json({ success: false, message: '❌ 解析失敗' });
+            console.error(`[Request: ${request_id}] 解析失敗:`, parseError.message);
+            console.error('原始輸出內容:', stdout);
+            res.status(500).json({ success: false, message: `❌ 解析失敗: ${parseError.message}` });
         }
     });
 });
@@ -110,7 +123,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (interaction.commandName === 'upload') {
         const requestId = uuidv4();
-        const baseUrl = process.env.BACKEND_URL || 'http://localhost:3000';
+        // 修正：確保 BACKEND_URL 如果沒設定，預設指向 6567 而不是 3000
+        const baseUrl = process.env.BACKEND_URL || 'http://localhost:6567';
         
         // 將頻道與使用者資訊帶入 URL 參數
         const uploadUrl = `${baseUrl}?request_id=${requestId}&channel_id=${interaction.channelId}&user_id=${interaction.user.id}`;
