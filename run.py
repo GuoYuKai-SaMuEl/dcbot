@@ -10,6 +10,7 @@ import asyncio
 import datetime
 import requests
 import dice
+import upload_utils
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='/',intents=intents)
 
@@ -18,6 +19,12 @@ async def on_ready():
     await bot.sync_commands(guild_ids=[1206260664742580234])
     print(f"目前登入身份 --> {bot.user}")
     clock.start()
+
+@bot.slash_command(name="upload", description = "上傳檔案到我的後端")
+async def upload(interaction: discord.Interaction):
+    """彈出上傳按鈕，點擊後開啟 Modal 進行檔案上傳"""
+    await interaction.response.send_message("請點擊下方按鈕以開啟上傳介面：", view=upload_utils.UploadView(), ephemeral=True)
+
 @bot.event
 async def on_message(message: discord.Message):
     print(message)
