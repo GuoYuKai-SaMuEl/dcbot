@@ -16,7 +16,7 @@ bot = commands.Bot(command_prefix='/',intents=intents)
 
 @bot.event
 async def on_ready():
-    await bot.sync_commands(guild_ids=[1206260664742580234])
+    await bot.sync_commands() # 移除 guild_ids 以同步為全域指令
     print(f"目前登入身份 --> {bot.user}")
     clock.start()
 
