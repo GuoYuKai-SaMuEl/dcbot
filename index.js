@@ -4,7 +4,8 @@ const {
     GatewayIntentBits, 
     REST, 
     Routes, 
-    Events
+    Events,
+    Partials // 新增 Partials 支援
 } = require('discord.js');
 const { v4: uuidv4 } = require('uuid');
 const express = require('express');
@@ -18,8 +19,10 @@ const { exec } = require('child_process');
 const client = new Client({ 
     intents: [
         GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages // 新增發送訊息權限
-    ] 
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.DirectMessages // 新增私訊意圖
+    ],
+    partials: [Partials.Channel] // 私訊必備設定
 });
 
 const commands = [
@@ -106,17 +109,34 @@ app.post('/upload', upload.single('file'), (req, res) => {
             return res.status(500).json({ success: false, message: `❌ 解析失敗: ${parseError.message}` });
         }
 
-        // 2. 嘗試發送 Discord 訊息 (獨立於解析邏輯)
+        // 2. 嘗試發送 Discord 訊息 (雙重機制：頻道失敗則改私訊)
         try {
-            const channel = await client.channels.fetch(channel_id);
-            if (channel) {
-                await channel.send({
-                    content: `✅ **檔案上傳完成！**\n上傳者: <@${user_id}>\n檔名: \`${req.file.originalname}\`\n直接下載連結: ${rawUrl}`
+            let target;
+            try {
+                // 優先嘗試發送到頻道
+                target = await client.channels.fetch(channel_id);
+            } catch (err) {
+                console.log(`[Request: ${request_id}] 無法獲取頻道，準備嘗試私訊...`);
+            }
+
+            const messagePayload = {
+                content: `✅ **檔案上傳完成！**\n上傳者: <@${user_id}>\n檔名: \`${req.file.originalname}\`\n直接下載連結: ${rawUrl}`
+            };
+
+            if (target) {
+                // 嘗試在頻道發送
+                await target.send(messagePayload).catch(async (err) => {
+                    console.error(`[Request: ${request_id}] 頻道發送失敗 (${err.message})，嘗試私訊使用者...`);
+                    const user = await client.users.fetch(user_id);
+                    await user.send(messagePayload);
                 });
+            } else {
+                // 如果抓不到頻道，直接嘗試私訊
+                const user = await client.users.fetch(user_id);
+                await user.send(messagePayload);
             }
         } catch (discordError) {
-            console.error(`[Request: ${request_id}] Discord 發送失敗:`, discordError.message);
-            // 即使 Discord 失敗，我們仍回傳成功給前端，但告知 Discord 部分出錯
+            console.error(`[Request: ${request_id}] Discord 所有發送路徑皆失敗:`, discordError.message);
             return res.json({ 
                 success: true, 
                 message: `✅ 上傳成功，但 Discord 訊息發送失敗 (${discordError.message})`,
