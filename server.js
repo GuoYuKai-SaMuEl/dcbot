@@ -41,8 +41,9 @@ app.post('/upload', upload.single('file'), (req, res) => {
 
     console.log(`[Request: ${requestId}] 收到檔案: ${req.file.originalname}`);
 
-    // 執行 storageto CLI
-    const command = `storageto upload "${filePath}" --json`;
+    // 使用 bash -l -c 來強制載入使用者環境變數 (例如 .bashrc 中的 PATH)
+    const cliPath = process.env.STORAGETO_PATH || 'storageto';
+    const command = `bash -l -c '${cliPath} upload "${filePath}" --json'`;
 
     exec(command, (error, stdout, stderr) => {
         // 刪除暫存檔
