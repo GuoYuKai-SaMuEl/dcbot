@@ -15,7 +15,12 @@ const fs = require('fs');
 const { exec } = require('child_process');
 
 // --- 1. 初始化 Discord Bot ---
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({ 
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages // 新增發送訊息權限
+    ] 
+});
 
 const commands = [
     {
