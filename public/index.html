@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 素材上傳平台 (後端測試)</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background-color: #f4f4f9; }
+        .card { background: #fff; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 400px; text-align: center; }
+        .drop-zone { border: 2px dashed #ccc; padding: 2rem; margin-bottom: 1.5rem; cursor: pointer; border-radius: 8px; transition: border 0.3s; }
+        .drop-zone:hover { border-color: #5865F2; }
+        button { background-color: #5865F2; color: white; border: none; padding: 0.8rem 1.5rem; border-radius: 6px; cursor: pointer; font-size: 1rem; width: 100%; }
+        button:hover { background-color: #4752c4; }
+        #progress { margin-top: 1rem; color: #666; font-size: 0.9rem; }
+        #status { margin-top: 1rem; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>📁 檔案上傳</h2>
+        <p>上傳至您的後端機器 (無大小限制測試)</p>
+        <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
+            <span id="fileName">點擊或拖放檔案到此處</span>
+        </div>
+        <input type="file" id="fileInput" style="display:none" onchange="updateFileName(this)">
+        <button onclick="uploadFile()">開始上傳</button>
+        <div id="progress"></div>
+        <div id="status"></div>
+    </div>
+
+    <script>
+        function updateFileName(input) {
+            if (input.files.length > 0) {
+                document.getElementById('fileName').innerText = input.files[0].name;
+            }
+        }
+
+        function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            if (fileInput.files.length === 0) return alert('請先選擇檔案');
+
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const status = document.getElementById('status');
+            const progress = document.getElementById('progress');
+            status.innerText = '📤 上傳中...';
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/upload', true);
+
+            // 進度追蹤
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    progress.innerText = `進度: ${percent}% (${(e.loaded / (1024 * 1024)).toFixed(2)} MB / ${(e.total / (1024 * 1024)).toFixed(2)} MB)`;
+                }
+            };
+
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    status.style.color = 'green';
+                    status.innerText = xhr.responseText;
+                } else {
+                    status.style.color = 'red';
+                    status.innerText = '❌ 上傳失敗: ' + xhr.responseText;
+                }
+            };
+
+            xhr.send(formData);
+        }
+    </script>
+</body>
+</html>
