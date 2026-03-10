@@ -13,7 +13,7 @@
         button:hover { background-color: #4752c4; }
         #progress { margin-top: 1rem; color: #666; font-size: 0.9rem; }
         #status { margin-top: 1rem; font-weight: bold; overflow-wrap: break-word; }
-        .request-id { font-size: 0.8rem; color: #aaa; margin-bottom: 1rem; }
+        .info { font-size: 0.8rem; color: #aaa; margin-bottom: 1rem; }
         #link-container { margin-top: 1.5rem; padding: 1rem; background: #eef; border-radius: 8px; display: none; }
         a { color: #5865F2; font-weight: bold; word-break: break-all; }
     </style>
@@ -21,25 +21,27 @@
 <body>
     <div class="card">
         <h2>📁 檔案上傳</h2>
-        <div id="requestDisplay" class="request-id"></div>
+        <div id="infoDisplay" class="info"></div>
         <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
             <span id="fileName">點擊或拖放檔案到此處</span>
         </div>
         <input type="file" id="fileInput" style="display:none" onchange="updateFileName(this)">
-        <button id="uploadBtn" onclick="uploadFile()">開始同步上傳</button>
+        <button id="uploadBtn" onclick="uploadFile()">開始同步並回傳至 Discord</button>
         <div id="progress"></div>
         <div id="status"></div>
         <div id="link-container">
-            上傳成功！您的分享連結：<br><br>
+            上傳成功！檔案連結已發送至 Discord：<br><br>
             <a id="downloadLink" href="#" target="_blank"></a>
         </div>
     </div>
 
     <script>
-        // 從 URL 取得 Request ID
+        // 從 URL 取得參數
         const urlParams = new URLSearchParams(window.location.search);
         const requestId = urlParams.get('request_id') || '無';
-        document.getElementById('requestDisplay').innerText = `Request ID: ${requestId}`;
+        const channelId = urlParams.get('channel_id');
+        const userId = urlParams.get('user_id');
+        document.getElementById('infoDisplay').innerText = `ID: ${requestId.substring(0, 8)}... | User: ${userId}`;
 
         function updateFileName(input) {
             if (input.files.length > 0) {
@@ -55,6 +57,8 @@
             const formData = new FormData();
             formData.append('file', file);
             formData.append('request_id', requestId);
+            formData.append('channel_id', channelId);
+            formData.append('user_id', userId);
 
             const status = document.getElementById('status');
             const progress = document.getElementById('progress');
@@ -63,7 +67,7 @@
 
             btn.disabled = true;
             linkContainer.style.display = 'none';
-            status.innerText = '📤 上傳至後端伺服器中...';
+            status.innerText = '📤 上傳同步中...';
 
             const xhr = new XMLHttpRequest();
             xhr.open('POST', '/upload', true);
@@ -71,7 +75,7 @@
             xhr.upload.onprogress = function(e) {
                 if (e.lengthComputable) {
                     const percent = Math.round((e.loaded / e.total) * 100);
-                    progress.innerText = `[1/2] 上傳至後端: ${percent}%`;
+                    progress.innerText = `[1/2] 上傳中: ${percent}%`;
                 }
             };
 
@@ -80,14 +84,14 @@
                 if (xhr.status === 200) {
                     const res = JSON.parse(xhr.responseText);
                     status.style.color = 'green';
-                    status.innerText = '[2/2] 平台同步完成！';
+                    status.innerText = '✅ 完成！請回到 Discord 查看。';
                     
                     document.getElementById('downloadLink').href = res.download_url;
                     document.getElementById('downloadLink').innerText = res.download_url;
                     linkContainer.style.display = 'block';
                 } else {
                     status.style.color = 'red';
-                    status.innerText = '❌ 發生錯誤: ' + xhr.responseText;
+                    status.innerText = '❌ 發生錯誤';
                 }
             };
 
