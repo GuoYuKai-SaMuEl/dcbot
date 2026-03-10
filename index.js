@@ -4,13 +4,8 @@ const {
     GatewayIntentBits, 
     REST, 
     Routes, 
-    ModalBuilder, 
-    TextInputBuilder, 
-    TextInputStyle, 
-    ActionRowBuilder, 
-    FileUploadBuilder, // 2026 年新組件
-    ComponentType,
-    Events
+    Events,
+    ApplicationCommandOptionType
 } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
@@ -19,10 +14,25 @@ const axios = require('axios');
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 // --- 指令註冊 ---
+// 我們將上傳功能改為指令參數，這是目前最穩定且支援大檔案的方式
 const commands = [
     {
         name: 'upload',
-        description: '上傳檔案到我的後端 (Modal 介面)'
+        description: '直接上傳檔案到我的後端',
+        options: [
+            {
+                name: 'file',
+                description: '請選擇要上傳的檔案',
+                type: ApplicationCommandOptionType.Attachment,
+                required: true
+            },
+            {
+                name: 'description',
+                description: '檔案描述',
+                type: ApplicationCommandOptionType.String,
+                required: false
+            }
+        ]
     }
 ];
 
@@ -37,7 +47,7 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
         );
         console.log('成功註冊全域指令');
     } catch (error) {
-        console.error(error);
+        console.error('註冊指令失敗:', error);
     }
 })();
 
@@ -47,90 +57,56 @@ client.on(Events.ClientReady, () => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
-    // 1. 處理斜線指令
-    if (interaction.isChatInputCommand()) {
-        if (interaction.commandName === 'upload') {
-            // 建立 Modal
-            const modal = new ModalBuilder()
-                .setCustomId('upload_modal')
-                .setTitle('檔案上傳至後端');
+    if (!interaction.isChatInputCommand()) return;
 
-            // 檔案上傳組件 (2026 版本)
-            const fileInput = new FileUploadBuilder()
-                .setCustomId('file_upload_field')
-                .setLabel('請選擇檔案 (上限 10MB)')
-                .setMinValues(1)
-                .setMaxValues(1)
-                .setRequired(true);
+    if (interaction.commandName === 'upload') {
+        // 先延遲回應，因為下載檔案可能需要時間
+        await interaction.deferReply({ ephemeral: true });
 
-            // 描述輸入框
-            const descInput = new TextInputBuilder()
-                .setCustomId('file_description')
-                .setLabel('檔案描述')
-                .setStyle(TextInputStyle.Paragraph)
-                .setRequired(false);
+        // 獲取參數
+        const attachment = interaction.options.getAttachment('file');
+        const description = interaction.options.getString('description') || '無';
 
-            // 將組件加入 ActionRows
-            const row1 = new ActionRowBuilder().addComponents(fileInput);
-            const row2 = new ActionRowBuilder().addComponents(descInput);
+        // --- 後端處理邏輯範例 ---
+        console.log('--- 後端開始處理 ---');
+        console.log(`檔名: ${attachment.name}`);
+        console.log(`大小: ${attachment.size} bytes (${(attachment.size / 1024).toFixed(2)} KB)`);
+        console.log(`內容類型: ${attachment.contentType}`);
+        console.log(`描述: ${description}`);
+        console.log('--- 處理完成 ---');
 
-            modal.addComponents(row1, row2);
-
-            // 顯示 Modal
-            await interaction.showModal(modal);
+        // 建立儲存目錄
+        const uploadDir = path.join(__dirname, 'uploads');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir);
         }
-    }
 
-    // 2. 處理 Modal 提交
-    if (interaction.isModalSubmit()) {
-        if (interaction.customId === 'upload_modal') {
-            await interaction.deferReply({ ephemeral: true });
+        const filePath = path.join(uploadDir, attachment.name);
+        
+        try {
+            // 下載檔案
+            const response = await axios({
+                method: 'get',
+                url: attachment.url,
+                responseType: 'stream'
+            });
 
-            // 獲取上傳的檔案 (Collection of Attachment)
-            const files = interaction.fields.getUploadedFiles('file_upload_field');
-            const description = interaction.fields.getTextInputValue('file_description');
+            const writer = fs.createWriteStream(filePath);
+            response.data.pipe(writer);
 
-            if (!files || files.size === 0) {
-                return interaction.followUp({ content: '❌ 未偵測到上傳檔案', ephemeral: true });
-            }
-
-            const attachment = files.first();
-            
-            // --- 後端處理邏輯範例 ---
-            console.log('--- 後端開始處理 (JS) ---');
-            console.log(`檔名: ${attachment.name}`);
-            console.log(`大小: ${attachment.size} bytes (${(attachment.size / 1024).toFixed(2)} KB)`);
-            console.log(`描述: ${description || '無'}`);
-            console.log('--- 處理完成 ---');
-
-            // 儲存檔案到本地 (模擬後端存檔)
-            const uploadDir = path.join(__dirname, 'uploads');
-            if (!fs.existsSync(uploadDir)) {
-                fs.mkdirSync(uploadDir);
-            }
-
-            const filePath = path.join(uploadDir, attachment.name);
-            
-            try {
-                const response = await axios({
-                    method: 'get',
-                    url: attachment.url,
-                    responseType: 'stream'
+            writer.on('finish', () => {
+                interaction.editReply({
+                    content: `✅ **檔案上傳成功！**\n**檔名:** \`${attachment.name}\`\n**大小:** ${(attachment.size / 1024).toFixed(2)} KB\n**描述:** ${description}`
                 });
+            });
 
-                const writer = fs.createWriteStream(filePath);
-                response.data.pipe(writer);
+            writer.on('error', (err) => {
+                throw err;
+            });
 
-                writer.on('finish', () => {
-                    interaction.followUp({
-                        content: `✅ **檔案已成功存入後端！**\n**檔名:** \`${attachment.name}\`\n**大小:** ${(attachment.size / 1024).toFixed(2)} KB`,
-                        ephemeral: true
-                    });
-                });
-            } catch (err) {
-                console.error('下載檔案失敗:', err);
-                await interaction.followUp({ content: '❌ 存檔至後端時發生錯誤', ephemeral: true });
-            }
+        } catch (err) {
+            console.error('下載失敗:', err);
+            await interaction.editReply({ content: '❌ 存檔至後端時發生錯誤' });
         }
     }
 });
