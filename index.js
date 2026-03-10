@@ -124,13 +124,18 @@ app.post('/upload', upload.single('file'), (req, res) => {
             };
 
             if (target) {
+                // 診斷：檢查機器人在該頻道的權限
+                const permissions = target.permissionsFor(client.user);
+                console.log(`[Request: ${request_id}] 頻道權限檢查: ViewChannel=${permissions.has('ViewChannel')}, SendMessages=${permissions.has('SendMessages')}`);
+
                 // 嘗試在頻道發送
                 await target.send(messagePayload).catch(async (err) => {
                     console.error(`[Request: ${request_id}] 頻道發送失敗 (${err.message})，嘗試私訊使用者...`);
                     const user = await client.users.fetch(user_id);
                     await user.send(messagePayload);
                 });
-            } else {
+            }
+ else {
                 // 如果抓不到頻道，直接嘗試私訊
                 const user = await client.users.fetch(user_id);
                 await user.send(messagePayload);
