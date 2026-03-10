@@ -62,7 +62,14 @@ app.post('/upload', upload.single('file'), (req, res) => {
 
         try {
             const result = JSON.parse(stdout);
-            const downloadUrl = result.file_info.url;
+            
+            // 修正：使用 PascalCase 欄位名稱 (FileInfo)
+            const fileInfo = result.FileInfo || result.file_info; // 相容性處理
+            const downloadUrl = fileInfo ? fileInfo.url : null;
+
+            if (!downloadUrl) {
+                throw new Error('找不到下載連結');
+            }
 
             console.log(`[Request: ${requestId}] 上傳完成: ${downloadUrl}`);
             
@@ -73,7 +80,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
                 download_url: downloadUrl
             });
         } catch (parseError) {
-            console.error('解析 CLI 輸出失敗:', stdout);
+            console.error('解析 CLI 輸出失敗，輸出內容為:', stdout);
             res.status(500).json({ success: false, message: '❌ 解析平台結果失敗' });
         }
     });
