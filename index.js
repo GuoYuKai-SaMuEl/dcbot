@@ -128,34 +128,41 @@ app.post('/upload', upload.single('file'), (req, res) => {
             return res.status(500).json({ success: false, message: `❌ 解析失敗: ${parseError.message}` });
         }
 
+        // 2. 嘗試發送 Discord 訊息 (優先使用互動回應，備援為頻道/私訊發送)
         try {
-            let target;
-            try {
-                target = await client.channels.fetch(channel_id);
-            } catch (err) {
-                console.log(`[Request: ${request_id}] 獲取頻道失敗，嘗試私訊...`);
-            }
-
             const fileSizeMB = (req.file.size / (1024 * 1024)).toFixed(2);
             const fileSizeKB = (req.file.size / 1024).toFixed(2);
             const sizeDisplay = fileSizeMB >= 1 ? `${fileSizeMB} MB` : `${fileSizeKB} KB`;
 
-            const messagePayload = {
-                content: `✅ **檔案上傳完成！**\n上傳者: <@${user_id}>\n檔名: \`${req.file.originalname}\` (${sizeDisplay})\n🔗 **[點我直接下載](${rawUrl})**`
-            };
+            const messageContent = `✅ **檔案上傳完成！**\n上傳者: <@${user_id}>\n檔名: \`${req.file.originalname}\` (${sizeDisplay})\n🔗 **[點我直接下載](${rawUrl})**`;
+            
+            const cachedInteraction = interactionCache.get(request_id);
 
-            if (target) {
-                await target.send(messagePayload).catch(async (err) => {
-                    console.error(`頻道發送失敗，嘗試私訊使用者...`);
-                    const user = await client.users.fetch(user_id);
-                    await user.send(messagePayload);
+            if (cachedInteraction) {
+                console.log(`[Diagnostic: ${request_id}] 偵測到有效的互動快取，正在執行 followUp...`);
+                await cachedInteraction.followUp({
+                    content: messageContent,
+                    ephemeral: false // 公開顯示在該視窗中
                 });
+                console.log(`[Diagnostic: ${request_id}] followUp 發送成功。`);
+                interactionCache.delete(request_id);
             } else {
-                const user = await client.users.fetch(user_id);
-                await user.send(messagePayload);
+                console.log(`[Diagnostic: ${request_id}] 互動快取已過期或不存在，嘗試備援發送路徑...`);
+                
+                // 備援：嘗試直接發送至頻道或使用者
+                try {
+                    const channel = await client.channels.fetch(channel_id);
+                    await channel.send(messageContent);
+                    console.log(`[Diagnostic: ${request_id}] 備援頻道發送成功。`);
+                } catch (err) {
+                    console.log(`[Diagnostic: ${request_id}] 備援頻道發送失敗: ${err.message}，改發私訊...`);
+                    const user = await client.users.fetch(user_id);
+                    await user.send(messageContent);
+                    console.log(`[Diagnostic: ${request_id}] 備援私訊發送成功。`);
+                }
             }
         } catch (discordError) {
-            console.error(`Discord 所有發送路徑皆失敗:`, discordError.message);
+            console.error(`[Diagnostic: ${request_id}] Discord 所有發送路徑皆失敗:`, discordError.message);
         }
 
         res.json({ success: true, download_url: rawUrl });
