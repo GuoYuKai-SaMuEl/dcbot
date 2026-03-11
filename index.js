@@ -29,30 +29,45 @@ const commands = [
     {
         name: 'upload',
         description: '上傳檔案並在頻道公開分享直接下載連結',
-        // 2026 年新規定：明確指定指令可以在私訊與伺服器中使用
-        integration_types: [0, 1], // 0: Guild Install, 1: User Install
-        contexts: [0, 1, 2]       // 0: Guild, 1: Bot DM, 2: Private DM/Groups
+        integration_types: [0, 1],
+        contexts: [0, 1, 2]
     }
 ];
 
-// 用來暫存互動物件 (Interaction Cache)
-// 因為 Discord 的 Interaction Token 有效期約 15 分鐘，適合處理上傳任務
-const interactionCache = new Map();
-
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
+/**
+ * 💡 指令管理邏輯
+ * 如果您看到重複的指令，請先取消下方「清空舊指令」部分的註解並執行一次。
+ */
 (async () => {
     try {
-        console.log('正在刷新斜線指令...');
-        await rest.put(
-            process.env.GUILD_ID 
-                ? Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID)
-                : Routes.applicationCommands(process.env.CLIENT_ID),
-            { body: commands }
-        );
-        console.log('✅ 指令同步成功');
+        console.log('--- 指令同步程序開始 ---');
+
+        // 【清空舊指令專區】: 如果要徹底清除重複指令，請取消下面這兩行的註解並執行一次，然後再重新註冊
+        // console.log('正在強制清空伺服器指令...');
+        // await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), { body: [] });
+        // console.log('正在強制清空全域指令...');
+        // await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: [] });
+
+        if (process.env.GUILD_ID) {
+            console.log(`正在同步伺服器指令 [Guild: ${process.env.GUILD_ID}]...`);
+            await rest.put(
+                Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
+                { body: commands }
+            );
+            console.log('✅ 伺服器指令同步成功 (立即生效)');
+        } else {
+            console.log('正在同步全域指令 (Global Commands)...');
+            await rest.put(
+                Routes.applicationCommands(process.env.CLIENT_ID),
+                { body: commands }
+            );
+            console.log('✅ 全域指令已發送 (同步可能需要 1 小時)');
+        }
+        console.log('------------------------');
     } catch (error) {
-        console.error(error);
+        console.error('❌ 指令同步失敗:', error);
     }
 })();
 
@@ -81,7 +96,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
     
     if (!req.file) return res.status(400).json({ success: false, message: '❌ 沒有選擇檔案' });
 
-    console.log(`[Request: ${request_id}] 收到來自使用者 ${user_id} 的檔案，準備同步並發送公開連結`);
+    console.log(`[Request: ${request_id}] 收到來自使用者 ${user_id} 的檔案: ${req.file.originalname}`);
 
     const cliPath = process.env.STORAGETO_PATH || 'storageto';
     const command = `bash -l -c '${cliPath} upload "${req.file.path}" --json'`;
@@ -98,37 +113,45 @@ app.post('/upload', upload.single('file'), (req, res) => {
         try {
             const jsonStart = stdout.indexOf('{');
             const jsonEnd = stdout.lastIndexOf('}');
-            const result = JSON.parse(stdout.substring(jsonStart, jsonEnd + 1));
+            if (jsonStart === -1 || jsonEnd === -1) throw new Error('找不到 JSON 內容');
+
+            const cleanJson = stdout.substring(jsonStart, jsonEnd + 1);
+            const result = JSON.parse(cleanJson);
             const fileInfo = result.FileInfo || result.file_info;
             rawUrl = fileInfo?.raw_url || fileInfo?.RawUrl || fileInfo?.url || fileInfo?.Url;
+            
+            if (!rawUrl) throw new Error('解析成功但找不到下載連結');
+
+            console.log(`[Request: ${request_id}] 上傳成功，URL: ${rawUrl}`);
         } catch (parseError) {
-            return res.status(500).json({ success: false, message: '❌ 解析失敗' });
+            console.error(`[Request: ${request_id}] 解析失敗:`, parseError.message);
+            return res.status(500).json({ success: false, message: `❌ 解析失敗: ${parseError.message}` });
         }
 
-        // --- 核心變動：使用 followUp 發送公開訊息 ---
         try {
-            const cachedInteraction = interactionCache.get(request_id);
-            const messageContent = `📤 **檔案上傳完成！**\n上傳者: <@${user_id}>\n檔名: \`${req.file.originalname}\`\n🔗 **[點我直接下載](${rawUrl})**`;
+            let target;
+            try {
+                target = await client.channels.fetch(channel_id);
+            } catch (err) {
+                console.log(`[Request: ${request_id}] 獲取頻道失敗，嘗試私訊...`);
+            }
 
-            if (cachedInteraction) {
-                // 使用 followUp，預設 ephemeral 為 false，所以是公開的
-                await cachedInteraction.followUp({
-                    content: messageContent,
-                    ephemeral: false
+            const messagePayload = {
+                content: `✅ **檔案上傳完成！**\n上傳者: <@${user_id}>\n檔名: \`${req.file.originalname}\`\n🔗 **[點我直接下載](${rawUrl})**`
+            };
+
+            if (target) {
+                await target.send(messagePayload).catch(async (err) => {
+                    console.error(`頻道發送失敗，嘗試私訊使用者...`);
+                    const user = await client.users.fetch(user_id);
+                    await user.send(messagePayload);
                 });
-                interactionCache.delete(request_id); // 任務完成，移除快取
             } else {
-                // 如果快取不見了（例如重啟或過期超過 15 分鐘），則回退到一般頻道發送
-                const channel = await client.channels.fetch(channel_id);
-                if (channel) await channel.send(messageContent);
+                const user = await client.users.fetch(user_id);
+                await user.send(messagePayload);
             }
         } catch (discordError) {
-            console.error(`Discord 發送失敗:`, discordError.message);
-            // 最後防線：嘗試直接私訊使用者
-            try {
-                const user = await client.users.fetch(user_id);
-                await user.send(`✅ 上傳成功，但頻道發送失敗。您的連結為: ${rawUrl}`);
-            } catch (dmErr) { console.error('私訊也失敗'); }
+            console.error(`Discord 所有發送路徑皆失敗:`, discordError.message);
         }
 
         res.json({ success: true, download_url: rawUrl });
@@ -143,21 +166,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const requestId = uuidv4();
         const baseUrl = process.env.BACKEND_URL || 'http://localhost:6567';
         
-        // 1. 將互動物件存入快取
         interactionCache.set(requestId, interaction);
-
-        // 2. 15 分鐘後自動清理快取（避免記憶體洩漏）
         setTimeout(() => interactionCache.delete(requestId), 15 * 60 * 1000);
 
         const uploadUrl = `${baseUrl}?request_id=${requestId}&channel_id=${interaction.channelId}&user_id=${interaction.user.id}`;
         
-        // 3. 回傳隱私訊息給使用者
         await interaction.reply({
-            content: `👋 您好！\n請點擊下方連結開始上傳檔案：\n🔗 **[前往上傳頁面](${uploadUrl})**\n\n*(完成後，我會在此頻道發送一個所有人可見的下載連結)*`,
+            content: `👋 您好！請點擊連結開始上傳檔案：\n🔗 **[前往上傳頁面](${uploadUrl})**\n*(完成後會在此頻道分享連結)*`,
             ephemeral: true
         });
     }
 });
+
+const interactionCache = new Map();
 
 client.login(process.env.DISCORD_TOKEN).then(() => {
     app.listen(PORT, '0.0.0.0', () => {
