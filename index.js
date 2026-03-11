@@ -136,8 +136,12 @@ app.post('/upload', upload.single('file'), (req, res) => {
                 console.log(`[Request: ${request_id}] 獲取頻道失敗，嘗試私訊...`);
             }
 
+            const fileSizeMB = (req.file.size / (1024 * 1024)).toFixed(2);
+            const fileSizeKB = (req.file.size / 1024).toFixed(2);
+            const sizeDisplay = fileSizeMB >= 1 ? `${fileSizeMB} MB` : `${fileSizeKB} KB`;
+
             const messagePayload = {
-                content: `✅ **檔案上傳完成！**\n上傳者: <@${user_id}>\n檔名: \`${req.file.originalname}\`\n🔗 **[點我直接下載](${rawUrl})**`
+                content: `✅ **檔案上傳完成！**\n上傳者: <@${user_id}>\n檔名: \`${req.file.originalname}\` (${sizeDisplay})\n🔗 **[點我直接下載](${rawUrl})**`
             };
 
             if (target) {
