@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 素材上傳平台</title>
+    <title>AI 素材上傳 (分片模式)</title>
     <style>
         body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background-color: #f4f4f9; }
         .card { background: #fff; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 450px; text-align: center; }
@@ -12,115 +12,109 @@
         button { background-color: #5865F2; color: white; border: none; padding: 0.8rem 1.5rem; border-radius: 6px; cursor: pointer; font-size: 1rem; width: 100%; }
         button:disabled { background-color: #ccc; cursor: not-allowed; }
         #progress-container { width: 100%; background-color: #eee; border-radius: 10px; margin-top: 1rem; display: none; }
-        #progress-bar { width: 0%; height: 10px; background-color: #5865F2; border-radius: 10px; transition: width 0.3s; }
-        #status { margin-top: 1rem; font-weight: bold; font-size: 0.9rem; word-break: break-all; }
-        .info { font-size: 0.8rem; color: #aaa; margin-bottom: 1rem; }
-        #link-container { margin-top: 1.5rem; padding: 1rem; background: #eef; border-radius: 8px; display: none; }
-        a { color: #5865F2; font-weight: bold; word-break: break-all; }
+        #progress-bar { width: 0%; height: 10px; background-color: #5865F2; border-radius: 10px; transition: width 0.1s; }
+        #status { margin-top: 1rem; font-weight: bold; font-size: 0.9rem; }
+        #statusText { font-size: 0.8rem; color: #666; margin-top: 5px; }
+        #link-container { margin-top: 1.5rem; padding: 1rem; background: #eef; border-radius: 8px; display: none; word-break: break-all; }
     </style>
 </head>
 <body>
     <div class="card">
-        <h2>📁 檔案上傳</h2>
-        <div id="infoDisplay" class="info"></div>
+        <h2>📁 檔案上傳 (大檔案支援)</h2>
         <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
-            <span id="fileName">點擊或拖放檔案到此處</span>
+            <span id="fileName">點擊或拖放檔案</span>
         </div>
         <input type="file" id="fileInput" style="display:none" onchange="updateFileName(this)">
-        <button id="uploadBtn" onclick="uploadFile()">開始上傳並回傳至 Discord</button>
+        <button id="uploadBtn" onclick="startChunkedUpload()">開始上傳並同步</button>
         
         <div id="progress-container">
             <div id="progress-bar"></div>
         </div>
-        <div id="statusText" style="font-size: 0.8rem; color: #666; margin-top: 5px;"></div>
-        
+        <div id="statusText"></div>
         <div id="status"></div>
         
         <div id="link-container">
-            ✅ 上傳成功！連結已發送：<br><br>
-            <a id="downloadLink" href="#" target="_blank"></a>
+            ✅ 上傳成功！連結已發送至 Discord。
         </div>
     </div>
 
     <script>
         const urlParams = new URLSearchParams(window.location.search);
-        const requestId = urlParams.get('request_id') || '無';
+        const requestId = urlParams.get('request_id');
         const channelId = urlParams.get('channel_id');
         const userId = urlParams.get('user_id');
-        document.getElementById('infoDisplay').innerText = `ID: ${requestId.substring(0, 8)}...`;
+
+        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB 每片 (完美繞過 Cloudflare)
 
         function updateFileName(input) {
-            if (input.files.length > 0) {
-                document.getElementById('fileName').innerText = input.files[0].name;
-            }
+            if (input.files.length > 0) document.getElementById('fileName').innerText = input.files[0].name;
         }
 
-        function uploadFile() {
+        async function startChunkedUpload() {
             const fileInput = document.getElementById('fileInput');
             if (fileInput.files.length === 0) return alert('請先選擇檔案');
 
             const file = fileInput.files[0];
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('request_id', requestId);
-            formData.append('channel_id', channelId);
-            formData.append('user_id', userId);
-
-            const status = document.getElementById('status');
-            const statusText = document.getElementById('statusText');
+            const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+            
+            const btn = document.getElementById('uploadBtn');
             const progressContainer = document.getElementById('progress-container');
             const progressBar = document.getElementById('progress-bar');
-            const btn = document.getElementById('uploadBtn');
-            const linkContainer = document.getElementById('link-container');
+            const status = document.getElementById('status');
+            const statusText = document.getElementById('statusText');
 
             btn.disabled = true;
-            linkContainer.style.display = 'none';
             progressContainer.style.display = 'block';
-            status.innerText = '📤 正在傳輸資料...';
-            status.style.color = '#333';
+            status.innerText = '📤 正在分片傳輸中...';
 
-            const xhr = new XMLHttpRequest();
-            
-            xhr.upload.addEventListener('progress', (e) => {
-                if (e.lengthComputable) {
-                    const percent = Math.round((e.loaded / e.total) * 100);
-                    progressBar.style.width = percent + '%';
-                    statusText.innerText = `[1/2] 上傳中: ${percent}% (${(e.loaded/1024/1024).toFixed(1)}MB / ${(e.total/1024/1024).toFixed(1)}MB)`;
-                    
-                    if (percent === 100) {
-                        status.innerText = '⏳ 正在進行雲端同步，請稍候...';
-                        status.style.color = '#5865F2';
-                    }
+            for (let i = 0; i < totalChunks; i++) {
+                const start = i * CHUNK_SIZE;
+                const end = Math.min(file.size, start + CHUNK_SIZE);
+                const chunk = file.slice(start, end);
+
+                const formData = new FormData();
+                formData.append('chunk', chunk);
+                formData.append('request_id', requestId);
+                formData.append('chunk_index', i);
+                formData.append('total_chunks', totalChunks);
+                formData.append('filename', file.name);
+                formData.append('channel_id', channelId);
+                formData.append('user_id', userId);
+
+                const success = await uploadChunk(formData, i, totalChunks);
+                if (!success) {
+                    status.innerText = '❌ 上傳中斷，請重試';
+                    btn.disabled = false;
+                    return;
                 }
-            });
 
-            xhr.addEventListener('load', () => {
-                btn.disabled = false;
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    try {
+                const percent = Math.round(((i + 1) / totalChunks) * 100);
+                progressBar.style.width = percent + '%';
+                statusText.innerText = `進度: ${percent}% (${i + 1}/${totalChunks} 片)`;
+            }
+
+            status.innerText = '⏳ 正在合併檔案並同步至雲端平台...';
+            statusText.innerText = '大檔案處理中，請稍候約 1-2 分鐘。';
+        }
+
+        function uploadChunk(formData, index, total) {
+            return new Promise((resolve) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', '/upload-chunk');
+                xhr.onload = () => {
+                    if (xhr.status === 200) {
                         const res = JSON.parse(xhr.responseText);
-                        status.style.color = 'green';
-                        status.innerText = '✨ 完成！連結已同步至 Discord';
-                        document.getElementById('downloadLink').href = res.download_url;
-                        document.getElementById('downloadLink').innerText = res.download_url;
-                        linkContainer.style.display = 'block';
-                    } catch (e) {
-                        status.innerText = '✅ 上傳成功';
+                        if (res.status === 'merging') {
+                            document.getElementById('link-container').style.display = 'block';
+                        }
+                        resolve(true);
+                    } else {
+                        resolve(false);
                     }
-                } else {
-                    status.style.color = 'red';
-                    status.innerText = `❌ 錯誤: ${xhr.status}`;
-                }
+                };
+                xhr.onerror = () => resolve(false);
+                xhr.send(formData);
             });
-
-            xhr.addEventListener('error', () => {
-                btn.disabled = false;
-                status.style.color = 'red';
-                status.innerText = '❌ 網路連線中斷，請確認伺服器狀態。';
-            });
-
-            xhr.open('POST', '/upload');
-            xhr.send(formData);
         }
     </script>
 </body>
