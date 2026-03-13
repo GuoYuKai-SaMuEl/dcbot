@@ -77,6 +77,10 @@ const PORT = 6567;
 app.use(cors());
 app.use(express.static('public'));
 
+// 增加 body 解析限制 (雖然主要用 multer 處理，但這是保險)
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ limit: '500mb', extended: true }));
+
 const TEMP_DIR = path.join(__dirname, 'temp_uploads');
 if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR);
 
@@ -196,7 +200,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
 const interactionCache = new Map();
 
 client.login(process.env.DISCORD_TOKEN).then(() => {
-    app.listen(PORT, '0.0.0.0', () => {
+    const server = app.listen(PORT, '0.0.0.0', () => {
         console.log(`🚀 機器人與伺服器已啟動 (Port: ${PORT})`);
     });
+
+    // 關鍵：將伺服器超時時間設為 10 分鐘 (處理大檔案)
+    server.timeout = 600000;
+    server.keepAliveTimeout = 600000;
+    server.headersTimeout = 601000;
 });
