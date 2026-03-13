@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 素材上傳 (分片模式)</title>
+    <title>AI 素材上傳平台</title>
     <style>
         body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background-color: #f4f4f9; }
         .card { background: #fff; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 450px; text-align: center; }
@@ -20,12 +20,13 @@
 </head>
 <body>
     <div class="card">
-        <h2>📁 檔案上傳 (大檔案支援)</h2>
+        <h2>📁 檔案上傳</h2>
+        <div id="infoDisplay" style="font-size: 0.8rem; color: #aaa; margin-bottom: 1rem;"></div>
         <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
             <span id="fileName">點擊或拖放檔案</span>
         </div>
         <input type="file" id="fileInput" style="display:none" onchange="updateFileName(this)">
-        <button id="uploadBtn" onclick="startChunkedUpload()">開始上傳並同步</button>
+        <button id="uploadBtn" onclick="startChunkedUpload()">開始上傳</button>
         
         <div id="progress-container">
             <div id="progress-bar"></div>
@@ -43,8 +44,15 @@
         const requestId = urlParams.get('request_id');
         const channelId = urlParams.get('channel_id');
         const userId = urlParams.get('user_id');
+        if (requestId) document.getElementById('infoDisplay').innerText = `ID: ${requestId.substring(0, 8)}...`;
 
-        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB 每片 (完美繞過 Cloudflare)
+        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB 每片
+
+        function formatSize(bytes) {
+            if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(2) + ' GB';
+            if (bytes >= 1048576) return (bytes / 1048576).toFixed(2) + ' MB';
+            return (bytes / 1024).toFixed(2) + ' KB';
+        }
 
         function updateFileName(input) {
             if (input.files.length > 0) document.getElementById('fileName').innerText = input.files[0].name;
@@ -65,7 +73,7 @@
 
             btn.disabled = true;
             progressContainer.style.display = 'block';
-            status.innerText = '📤 正在分片傳輸中...';
+            status.innerText = '📤 正在傳輸中...';
 
             for (let i = 0; i < totalChunks; i++) {
                 const start = i * CHUNK_SIZE;
@@ -81,30 +89,30 @@
                 formData.append('channel_id', channelId);
                 formData.append('user_id', userId);
 
-                const success = await uploadChunk(formData, i, totalChunks);
+                const success = await uploadChunk(formData);
                 if (!success) {
                     status.innerText = '❌ 上傳中斷，請重試';
                     btn.disabled = false;
                     return;
                 }
 
-                const percent = Math.round(((i + 1) / totalChunks) * 100);
+                const currentUploaded = Math.min(file.size, (i + 1) * CHUNK_SIZE);
+                const percent = Math.round((currentUploaded / file.size) * 100);
                 progressBar.style.width = percent + '%';
-                statusText.innerText = `進度: ${percent}% (${i + 1}/${totalChunks} 片)`;
+                statusText.innerText = `進度: ${percent}% (${formatSize(currentUploaded)} / ${formatSize(file.size)})`;
             }
 
-            status.innerText = '⏳ 正在合併檔案並同步至雲端平台...';
-            statusText.innerText = '大檔案處理中，請稍候約 1-2 分鐘。';
+            status.innerText = '⏳ 正在同步至雲端平台...';
+            statusText.innerText = '檔案處理中，請稍候。';
         }
 
-        function uploadChunk(formData, index, total) {
+        function uploadChunk(formData) {
             return new Promise((resolve) => {
                 const xhr = new XMLHttpRequest();
                 xhr.open('POST', '/upload-chunk');
                 xhr.onload = () => {
                     if (xhr.status === 200) {
                         const res = JSON.parse(xhr.responseText);
-                        // 如果狀態是處理中，顯示連結容器
                         if (res.status === 'processing') {
                             document.getElementById('link-container').style.display = 'block';
                         }

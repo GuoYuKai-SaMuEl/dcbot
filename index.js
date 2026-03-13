@@ -28,7 +28,11 @@ const CHUNKS_DIR = path.join(__dirname, 'temp_chunks');
 if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR);
 if (!fs.existsSync(CHUNKS_DIR)) fs.mkdirSync(CHUNKS_DIR);
 
-const upload = multer({ dest: CHUNKS_DIR });
+// 顯式設定 multer 限制為 10GB
+const upload = multer({ 
+    dest: CHUNKS_DIR,
+    limits: { fileSize: 10 * 1024 * 1024 * 1024 } 
+});
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
@@ -44,18 +48,17 @@ app.post('/upload-chunk', upload.single('chunk'), async (req, res) => {
     const finalChunkPath = path.join(targetDir, chunk_index.toString());
     fs.renameSync(chunkPath, finalChunkPath);
 
-    console.log(`[Chunk: ${request_id}] 接收碎片 ${chunk_index}/${total_chunks}`);
+    // 修正：處理中文檔名轉碼
+    const originalName = Buffer.from(filename, 'latin1').toString('utf8');
+    console.log(`[Chunk: ${request_id}] 接收 ${originalName} 碎片 ${chunk_index}/${total_chunks}`);
 
     // 檢查是否所有碎片都到齊了
     if (fs.readdirSync(targetDir).length === parseInt(total_chunks)) {
         console.log(`[Chunk: ${request_id}] 碎片到齊，準備進入背景合併與同步...`);
         
-        // 立即回傳成功，避免前端最後一報請求超時
         res.json({ success: true, message: '同步處理中', status: 'processing' });
 
-        // 在背景執行合併與後續邏輯
         (async () => {
-            const originalName = Buffer.from(filename, 'latin1').toString('utf8');
             const finalFilePath = path.join(TEMP_DIR, `${request_id}-${originalName}`);
             const writeStream = fs.createWriteStream(finalFilePath);
 
@@ -73,7 +76,7 @@ app.post('/upload-chunk', upload.single('chunk'), async (req, res) => {
             });
         })();
         
-        return; // 結束 API 回應
+        return;
     }
 
     res.json({ success: true, message: '碎片上傳成功' });
