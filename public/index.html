@@ -104,7 +104,8 @@
                 xhr.onload = () => {
                     if (xhr.status === 200) {
                         const res = JSON.parse(xhr.responseText);
-                        if (res.status === 'merging') {
+                        // 如果狀態是處理中，顯示連結容器
+                        if (res.status === 'processing') {
                             document.getElementById('link-container').style.display = 'block';
                         }
                         resolve(true);

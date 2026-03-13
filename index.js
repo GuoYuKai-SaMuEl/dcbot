@@ -48,26 +48,32 @@ app.post('/upload-chunk', upload.single('chunk'), async (req, res) => {
 
     // 檢查是否所有碎片都到齊了
     if (fs.readdirSync(targetDir).length === parseInt(total_chunks)) {
-        console.log(`[Chunk: ${request_id}] 碎片到齊，準備合併...`);
+        console.log(`[Chunk: ${request_id}] 碎片到齊，準備進入背景合併與同步...`);
         
-        const originalName = Buffer.from(filename, 'latin1').toString('utf8');
-        const finalFilePath = path.join(TEMP_DIR, `${request_id}-${originalName}`);
-        const writeStream = fs.createWriteStream(finalFilePath);
+        // 立即回傳成功，避免前端最後一報請求超時
+        res.json({ success: true, message: '同步處理中', status: 'processing' });
 
-        for (let i = 0; i < total_chunks; i++) {
-            const partPath = path.join(targetDir, i.toString());
-            const data = fs.readFileSync(partPath);
-            writeStream.write(data);
-            fs.unlinkSync(partPath); // 合併後刪除碎片
-        }
-        writeStream.end();
+        // 在背景執行合併與後續邏輯
+        (async () => {
+            const originalName = Buffer.from(filename, 'latin1').toString('utf8');
+            const finalFilePath = path.join(TEMP_DIR, `${request_id}-${originalName}`);
+            const writeStream = fs.createWriteStream(finalFilePath);
 
-        writeStream.on('finish', () => {
-            fs.rmdirSync(targetDir); // 刪除碎片目錄
-            processFinalFile(request_id, finalFilePath, originalName, req.body);
-        });
+            for (let i = 0; i < total_chunks; i++) {
+                const partPath = path.join(targetDir, i.toString());
+                const data = fs.readFileSync(partPath);
+                writeStream.write(data);
+                fs.unlinkSync(partPath);
+            }
+            writeStream.end();
 
-        return res.json({ success: true, message: '合併中', status: 'merging' });
+            writeStream.on('finish', () => {
+                try { fs.rmdirSync(targetDir); } catch(e) {}
+                processFinalFile(request_id, finalFilePath, originalName, req.body);
+            });
+        })();
+        
+        return; // 結束 API 回應
     }
 
     res.json({ success: true, message: '碎片上傳成功' });
