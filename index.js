@@ -50,31 +50,42 @@ app.post('/upload-chunk', upload.single('chunk'), async (req, res) => {
 
     // 修正：使用 decodeURIComponent 解碼前端傳來的編碼檔名
     const originalName = decodeURIComponent(filename);
-    console.log(`[Chunk: ${request_id}] 接收 ${originalName} 碎片 ${chunk_index}/${total_chunks}`);
+    
+    // 獲取當前目錄下的碎片數量
+    const receivedChunks = fs.readdirSync(targetDir).length;
+    const total = parseInt(total_chunks);
+
+    console.log(`[Chunk: ${request_id}] 接收 ${originalName} 碎片 ${chunk_index}/${total_chunks} (進度: ${receivedChunks}/${total})`);
 
     // 檢查是否所有碎片都到齊了
-    if (fs.readdirSync(targetDir).length === parseInt(total_chunks)) {
+    if (receivedChunks === total) {
         console.log(`[Chunk: ${request_id}] 碎片到齊，準備進入背景合併與同步...`);
         
         res.json({ success: true, message: '同步處理中', status: 'processing' });
 
-        (async () => {
-            const finalFilePath = path.join(TEMP_DIR, `${request_id}-${originalName}`);
-            const writeStream = fs.createWriteStream(finalFilePath);
+        // 使用 setTimeout 稍微延遲合併，確保磁碟寫入完全結束
+        setTimeout(() => {
+            (async () => {
+                const finalFilePath = path.join(TEMP_DIR, `${request_id}-${originalName}`);
+                const writeStream = fs.createWriteStream(finalFilePath);
 
-            for (let i = 0; i < total_chunks; i++) {
-                const partPath = path.join(targetDir, i.toString());
-                const data = fs.readFileSync(partPath);
-                writeStream.write(data);
-                fs.unlinkSync(partPath);
-            }
-            writeStream.end();
+                for (let i = 0; i < total; i++) {
+                    const partPath = path.join(targetDir, i.toString());
+                    if (fs.existsSync(partPath)) {
+                        const data = fs.readFileSync(partPath);
+                        writeStream.write(data);
+                        fs.unlinkSync(partPath);
+                    }
+                }
+                writeStream.end();
 
-            writeStream.on('finish', () => {
-                try { fs.rmdirSync(targetDir); } catch(e) {}
-                processFinalFile(request_id, finalFilePath, originalName, req.body);
-            });
-        })();
+                writeStream.on('finish', () => {
+                    console.log(`[Chunk: ${request_id}] 合併完成: ${originalName}`);
+                    try { fs.rmdirSync(targetDir); } catch(e) {}
+                    processFinalFile(request_id, finalFilePath, originalName, req.body);
+                });
+            })();
+        }, 1000);
         
         return;
     }
