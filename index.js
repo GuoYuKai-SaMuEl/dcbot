@@ -84,7 +84,9 @@ const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, TEMP_DIR),
     filename: (req, file, cb) => {
         const requestId = req.body.request_id || 'unknown';
-        cb(null, `${requestId}-${Date.now()}-${file.originalname}`);
+        // 修正：將 latin1 轉碼回 utf8 處理中文檔名
+        const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        cb(null, `${requestId}-${Date.now()}-${originalName}`);
     }
 });
 const upload = multer({ storage: storage });
@@ -96,7 +98,9 @@ app.post('/upload', upload.single('file'), (req, res) => {
     
     if (!req.file) return res.status(400).json({ success: false, message: '❌ 沒有選擇檔案' });
 
-    console.log(`[Request: ${request_id}] 收到來自使用者 ${user_id} 的檔案: ${req.file.originalname}`);
+    // 修正：同樣在此處轉碼
+    const originalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+    console.log(`[Request: ${request_id}] 收到來自使用者 ${user_id} 的檔案: ${originalName}`);
 
     const cliPath = process.env.STORAGETO_PATH || 'storageto';
     const command = `bash -l -c '${cliPath} upload "${req.file.path}" --json'`;
@@ -134,7 +138,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
             const fileSizeKB = (req.file.size / 1024).toFixed(2);
             const sizeDisplay = fileSizeMB >= 1 ? `${fileSizeMB} MB` : `${fileSizeKB} KB`;
 
-            const messageContent = `✅ **檔案上傳完成！**\n上傳者: <@${user_id}>\n檔名: \`${req.file.originalname}\` (${sizeDisplay})\n🔗 **[點我直接下載](${rawUrl})**`;
+            const messageContent = `✅ **檔案上傳完成！**\n上傳者: <@${user_id}>\n檔名: \`${originalName}\` (${sizeDisplay})\n🔗 **[點我直接下載](${rawUrl})**`;
             
             const cachedInteraction = interactionCache.get(request_id);
 
