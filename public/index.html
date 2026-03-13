@@ -90,7 +90,7 @@
 
                 formData.append('user_id', userId);
 
-                const success = await uploadChunk(formData);
+                const success = await uploadChunk(formData, totalChunks);
                 if (!success) {
                     status.innerText = '❌ 上傳中斷，請重試';
                     btn.disabled = false;
@@ -107,7 +107,7 @@
             statusText.innerText = '檔案處理中，請稍候。';
         }
 
-        function uploadChunk(formData) {
+        function uploadChunk(formData, totalChunks) {
             return new Promise((resolve) => {
                 const xhr = new XMLHttpRequest();
                 xhr.open('POST', '/upload-chunk');
