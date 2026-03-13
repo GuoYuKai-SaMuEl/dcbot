@@ -48,8 +48,8 @@ app.post('/upload-chunk', upload.single('chunk'), async (req, res) => {
     const finalChunkPath = path.join(targetDir, chunk_index.toString());
     fs.renameSync(chunkPath, finalChunkPath);
 
-    // 修正：處理中文檔名轉碼
-    const originalName = Buffer.from(filename, 'latin1').toString('utf8');
+    // 修正：使用 decodeURIComponent 解碼前端傳來的編碼檔名
+    const originalName = decodeURIComponent(filename);
     console.log(`[Chunk: ${request_id}] 接收 ${originalName} 碎片 ${chunk_index}/${total_chunks}`);
 
     // 檢查是否所有碎片都到齊了
