@@ -78,22 +78,27 @@ app.use(cors());
 app.use(express.static('public'));
 
 // 增加 body 解析限制 (雖然主要用 multer 處理，但這是保險)
-app.use(express.json({ limit: '500mb' }));
-app.use(express.urlencoded({ limit: '500mb', extended: true }));
+app.use(express.json({ limit: '1024mb' }));
+app.use(express.urlencoded({ limit: '1024mb', extended: true }));
 
 const TEMP_DIR = path.join(__dirname, 'temp_uploads');
 if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR);
-
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, TEMP_DIR),
     filename: (req, file, cb) => {
         const requestId = req.body.request_id || 'unknown';
-        // 修正：將 latin1 轉碼回 utf8 處理中文檔名
         const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        console.log(`[I/O: ${requestId}] 開始將檔案寫入硬碟...`);
         cb(null, `${requestId}-${Date.now()}-${originalName}`);
     }
 });
-const upload = multer({ storage: storage });
+
+
+// 顯式設定 multer 限制為 1GB
+const upload = multer({ 
+    storage: storage,
+    limits: { fileSize: 1024 * 1024 * 1024 } 
+});
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 

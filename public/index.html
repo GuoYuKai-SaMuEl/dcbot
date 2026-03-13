@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 素材上傳平台 (Storage.to 同步)</title>
+    <title>AI 素材上傳平台</title>
     <style>
         body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background-color: #f4f4f9; }
         .card { background: #fff; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 450px; text-align: center; }
@@ -24,10 +24,10 @@
         <h2>📁 檔案上傳</h2>
         <div id="infoDisplay" class="info"></div>
         <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
-            <span id="fileName">點擊或拖放 PPTX/大檔案到此處</span>
+            <span id="fileName">點擊或拖放檔案到此處</span>
         </div>
         <input type="file" id="fileInput" style="display:none" onchange="updateFileName(this)">
-        <button id="uploadBtn" onclick="uploadFile()">開始同步並回傳至 Discord</button>
+        <button id="uploadBtn" onclick="uploadFile()">開始上傳並回傳至 Discord</button>
         
         <div id="progress-container">
             <div id="progress-bar"></div>
@@ -47,7 +47,7 @@
         const requestId = urlParams.get('request_id') || '無';
         const channelId = urlParams.get('channel_id');
         const userId = urlParams.get('user_id');
-        document.getElementById('infoDisplay').innerText = `Request ID: ${requestId.substring(0, 8)}...`;
+        document.getElementById('infoDisplay').innerText = `ID: ${requestId.substring(0, 8)}...`;
 
         function updateFileName(input) {
             if (input.files.length > 0) {
@@ -55,7 +55,7 @@
             }
         }
 
-        async function uploadFile() {
+        function uploadFile() {
             const fileInput = document.getElementById('fileInput');
             if (fileInput.files.length === 0) return alert('請先選擇檔案');
 
@@ -73,24 +73,23 @@
             const btn = document.getElementById('uploadBtn');
             const linkContainer = document.getElementById('link-container');
 
-            // 初始化介面
             btn.disabled = true;
             linkContainer.style.display = 'none';
             progressContainer.style.display = 'block';
-            status.innerText = '📤 正在初始化上傳...';
+            status.innerText = '📤 正在傳輸資料...';
             status.style.color = '#333';
 
-            // 使用 XMLHttpRequest 以獲得進度監控 (大檔案必備)
             const xhr = new XMLHttpRequest();
             
             xhr.upload.addEventListener('progress', (e) => {
                 if (e.lengthComputable) {
                     const percent = Math.round((e.loaded / e.total) * 100);
                     progressBar.style.width = percent + '%';
-                    statusText.innerText = `[1/2] 上傳至伺服器: ${percent}% (${(e.loaded/1024/1024).toFixed(1)}MB / ${(e.total/1024/1024).toFixed(1)}MB)`;
+                    statusText.innerText = `[1/2] 上傳中: ${percent}% (${(e.loaded/1024/1024).toFixed(1)}MB / ${(e.total/1024/1024).toFixed(1)}MB)`;
+                    
                     if (percent === 100) {
-                        status.innerText = '⏳ 檔案已到達伺服器，正在同步至雲端平台...';
-                        statusText.innerText = '這可能需要幾分鐘，請勿關閉網頁。';
+                        status.innerText = '⏳ 正在進行雲端同步，請稍候...';
+                        status.style.color = '#5865F2';
                     }
                 }
             });
@@ -101,29 +100,26 @@
                     try {
                         const res = JSON.parse(xhr.responseText);
                         status.style.color = 'green';
-                        status.innerText = '✨ 任務完成！連結已同步至 Discord';
+                        status.innerText = '✨ 完成！連結已同步至 Discord';
                         document.getElementById('downloadLink').href = res.download_url;
                         document.getElementById('downloadLink').innerText = res.download_url;
                         linkContainer.style.display = 'block';
                     } catch (e) {
-                        status.style.color = 'orange';
-                        status.innerText = '✅ 上傳似乎成功，但回傳解析異常。';
+                        status.innerText = '✅ 上傳成功';
                     }
                 } else {
                     status.style.color = 'red';
-                    status.innerText = `❌ 上傳失敗 (HTTP ${xhr.status}): ${xhr.responseText.substring(0, 50)}`;
+                    status.innerText = `❌ 錯誤: ${xhr.status}`;
                 }
             });
 
             xhr.addEventListener('error', () => {
                 btn.disabled = false;
                 status.style.color = 'red';
-                status.innerText = '❌ 網路連線錯誤，請檢查伺服器 Port 是否開啟。';
+                status.innerText = '❌ 網路連線中斷，請確認伺服器狀態。';
             });
 
             xhr.open('POST', '/upload');
-            // 針對大檔案取消超時限制 (在 XHR 層級)
-            xhr.timeout = 0; 
             xhr.send(formData);
         }
     </script>
